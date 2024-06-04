@@ -113,7 +113,13 @@ func (buffer *apiBuffer) handle() func(http.ResponseWriter, *http.Request) {
 		}
 
 		response, ok := <-responseChan
-		if ok || r.Method != http.MethodGet {
+
+		if r.Method != http.MethodGet {
+			rw.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if ok {
 			rw.WriteHeader(http.StatusOK)
 			rw.Write(response)
 		} else {
