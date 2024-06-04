@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 )
@@ -55,8 +55,7 @@ func processingLoop(requests chan apiRequest, ctx context.Context) <-chan struct
 			close(requests)
 		}()
 		data := make(map[string][]byte)
-		for {
-			req, ok := <-requests
+		for req := range requests {
 			switch req.verb {
 			case http.MethodDelete:
 				delete(data, req.key)
@@ -75,9 +74,6 @@ func processingLoop(requests chan apiRequest, ctx context.Context) <-chan struct
 				}
 			}
 			close(req.response)
-			if !ok {
-				return
-			}
 		}
 	}()
 	return done
@@ -98,7 +94,7 @@ func (buffer *apiBuffer) handle() func(http.ResponseWriter, *http.Request) {
 		responseChan := make(chan []byte)
 		request := apiRequest{verb: r.Method, key: r.URL.Path, response: responseChan}
 		if r.Method != http.MethodGet && r.Method != http.MethodDelete {
-			body, err := ioutil.ReadAll(r.Body)
+			body, err := io.ReadAll(io.Reader(r.Body))
 			defer r.Body.Close()
 			if err != nil {
 				log.Println(err)
@@ -107,9 +103,17 @@ func (buffer *apiBuffer) handle() func(http.ResponseWriter, *http.Request) {
 			}
 			request.value = body
 		}
-		buffer.requests <- request
+
+		select {
+		case buffer.requests <- request:
+		default:
+			log.Println("request buffer full or shutdown")
+			rw.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
 		response, ok := <-responseChan
-		if ok {
+		if ok || r.Method != http.MethodGet {
 			rw.WriteHeader(http.StatusOK)
 			rw.Write(response)
 		} else {
