@@ -53,7 +53,7 @@ func actor(requests chan apiRequest, ctx context.Context) <-chan struct{} {
 
 	go func() {
 		defer close(done)
-		processLoop(requests)
+		<-processLoop(requests)
 	}()
 
 	return done
@@ -97,7 +97,7 @@ func handle(rw http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	responseChan := make(chan []byte)
+	responseChan := make(chan []byte, 1)
 	request := apiRequest{verb: r.Method, key: r.URL.Path, response: responseChan}
 	if r.Method != http.MethodGet && r.Method != http.MethodDelete {
 		body, err := io.ReadAll(io.Reader(r.Body))
