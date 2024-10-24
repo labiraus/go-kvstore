@@ -8,12 +8,12 @@ import (
 )
 
 func main() {
-	ctx, ctxDone := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	done := startApi(ctx)
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	s := <-c
-	ctxDone()
+	cancel()
 	fmt.Println("user got signal: " + s.String() + " now closing")
 	<-done
 }
